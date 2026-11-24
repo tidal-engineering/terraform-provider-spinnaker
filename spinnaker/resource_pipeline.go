@@ -67,10 +67,22 @@ func resourcePipelineCreate(data *schema.ResourceData, meta interface{}) error {
 		return err
 	}
 
-	return resourcePipelineRead(data, meta)
+	return readPipeline(data, meta)
 }
 
+// resourcePipelineRead refreshes the resource. It drops a pipeline that was deleted outside Terraform
+// from state, so the plan recreates it or, if its config is gone too, has nothing to destroy.
 func resourcePipelineRead(data *schema.ResourceData, meta interface{}) error {
+	err := readPipeline(data, meta)
+	if err != nil && err.Error() == api.ErrCodeNoSuchEntityException {
+		data.SetId("")
+		return nil
+	}
+	return err
+}
+
+// readPipeline fails on a missing pipeline. The data source and the reads after create and update use it.
+func readPipeline(data *schema.ResourceData, meta interface{}) error {
 	clientConfig := meta.(gateConfig)
 	client := clientConfig.client
 	applicationName := data.Get("application").(string)
@@ -125,7 +137,7 @@ func resourcePipelineUpdate(data *schema.ResourceData, meta interface{}) error {
 	if err := api.UpdatePipeline(client, pipelineID.(string), pipe); err != nil {
 		return err
 	}
-	return resourcePipelineRead(data, meta)
+	return readPipeline(data, meta)
 }
 
 func resourcePipelineDelete(data *schema.ResourceData, meta interface{}) error {
@@ -149,6 +161,9 @@ func resourcePipelineExists(data *schema.ResourceData, meta interface{}) (bool, 
 
 	var p pipelineRead
 	if _, err := api.GetPipeline(client, applicationName, pipelineName, &p); err != nil {
+		if err.Error() == api.ErrCodeNoSuchEntityException {
+			return false, nil
+		}
 		return false, err
 	}
 
