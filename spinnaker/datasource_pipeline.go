@@ -27,6 +27,6 @@ func datasourcePipeline() *schema.Resource {
 				Computed: true,
 			},
 		},
-		Read: resourcePipelineRead,
+		Read: readPipeline,
 	}
 }
